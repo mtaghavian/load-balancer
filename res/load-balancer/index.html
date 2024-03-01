@@ -1,0 +1,258 @@
+<html style="background-color: white; color: black;">
+<head>
+    <title>Load Balancer</title>
+    <meta charset="utf-8">
+    <link rel="icon" href="/load-balancer/favicon.svg"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- UIkit  -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.6.18/dist/css/uikit.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/uikit@3.6.18/dist/js/uikit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/uikit@3.6.18/dist/js/uikit-icons.min.js"></script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+
+    <link rel="stylesheet" href="/load-balancer/styles.css">
+
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"/>
+
+    <style>
+       
+    </style>
+</head>
+<body>
+<div class="HeaderHeight HeaderBackground"
+     style="width: 100%; position: fixed;top: 0px; z-index: 1; background-color: #797979;">
+    <div class="Centered" style="">
+        <span id="PageTitle" class="HeaderTitle" style="text-align: center; color: white; width: calc(100% - 50px);">Load Balancer</span>
+        <img id="OptionBut" class="" src="/load-balancer/options-white.svg" style="width: 20px;">
+    </div>
+</div>
+
+<div class="Centered" id="MainDiv">
+    <table class="uk-table uk-table-striped">
+        <thead>
+        <tr>
+            <th>Server</th>
+            <th>Count</th>
+            <th>Volume</th>
+            <th>URIs</th>
+            <th>Delete</th>
+        </tr>
+        </thead>
+        <tbody id="tbody" style="font-family: monospace;">
+        </tbody>
+    </table>
+</div>
+
+<div id="option-modal" class="uk-flex-top" uk-modal>
+    <div class="uk-modal-dialog uk-margin-auto-vertical Centered" style="padding: 0px;">
+        <ul class="uk-nav uk-dropdown-nav" style="text-align: center;">
+            <li><a id="AddServerBut" class="ModalButtons" href="#"><img src="/load-balancer/plus.svg" style="display: inline-block; width: 15px; margin-right: 15px;"><span>Add server</span></a>
+            </li>
+            <li><a id="ListRoutedUrls" class="ModalButtons" href="#"><img src="/load-balancer/info.svg" style="display: inline-block; width: 15px; margin-right: 15px;"><span>List all routed URLs</span></a>
+            </li>
+            <li><a id="ClearBut" class="ModalButtons" href="#"><img src="/load-balancer/delete.svg" style="display: inline-block; width: 15px; margin-right: 15px;"><span>Clear logs</span></a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div id="urls-modal" class="uk-flex-top" uk-modal>
+    <div class="uk-modal-dialog uk-margin-auto-vertical Centered" style="padding: 20px;">
+        <div style="font-size: 1rem; color: black; padding-bottom: 10px;">Routed URIs</div>
+        <textarea class="uk-textarea" id="UriArea" readonly spellcheck="false" name="UriArea"
+                  style="height: 500px; min-width: 100%; font-family: monospace; font-size: 90%;"
+                  placeholder=""></textarea>
+        <p class="uk-text-right" style="margin: 0;">
+            <button class="uk-button uk-button-default uk-modal-close" style="margin: 10px;" type="button">Close
+            </button>
+            <button id="RefreshBut" class="uk-button uk-button-primary" style="margin: 10px;" type="button">Refresh
+            </button>
+        </p>
+    </div>
+</div>
+
+<div id="delete-modal" class="uk-flex-top" uk-modal>
+    <div class="uk-modal-dialog uk-margin-auto-vertical Centered" style="padding: 20px;">
+        <h5 id="DeleteMessage"></h5>
+        <p class="uk-text-right" style="margin: 0;">
+            <button class="uk-button uk-button-default uk-modal-close" style="margin: 10px;" type="button">No</button>
+            <button id="DeleteBut" class="uk-button uk-button-primary" style="margin: 10px;" type="button">Yes</button>
+        </p>
+    </div>
+</div>
+
+<div id="InputModal" class="uk-flex-top" uk-modal>
+    <div class="uk-modal-dialog uk-margin-auto-vertical Centered" style="padding: 20px;">
+        <div id="edit-modal-text" style="font-size: 1rem; color: black; padding-bottom: 10px;"></div>
+        <input class="uk-input" autocomplete="off" style="margin-bottom: 10px; padding: 10px;" id="modalField"
+               type="text" placeholder="">
+        <p class="uk-text-right" style="margin: 0;">
+            <button class="uk-button uk-button-default uk-modal-close" style="margin: 10px;" type="button">Close
+            </button>
+            <button id="SubmitBut" class="uk-button uk-button-primary" style="margin: 10px;" type="button">Submit
+            </button>
+        </p>
+    </div>
+</div>
+
+<script src="/load-balancer/script.js"></script>
+
+<script>
+    var server = null;
+    var inputModalChoice = null;
+
+    $("#DeleteBut").click(function () {
+        UIkit.modal($("#delete-modal")).hide();
+        $.ajax({
+            url: "/load-balancer/api/deleteServer",
+            type: "POST",
+            error: function (data, status) {
+            },
+            success: function (data, status) {
+                getServerList();
+                notify("primary", data, 3000);
+            },
+            data: server
+        });
+    });
+
+    var showUris = function () {
+        $("#UriArea").val("");
+        var source = event.target || event.srcElement;
+        if (source.getAttribute("data") != null) {
+            server = source.getAttribute("data");
+        }
+        UIkit.modal($("#urls-modal")).show();
+        $.ajax({
+            url: "/load-balancer/api/getRoutedUris",
+            type: "POST",
+            error: function (data, status) {
+            },
+            success: function (data, status) {
+                $("#UriArea").val("" + data);
+                $("#UriArea").scrollTop($("#UriArea")[0].scrollHeight + 100);
+            },
+            data: server
+        });
+    }
+    var deleteServer = function () {
+        var source = event.target || event.srcElement;
+        if (source.getAttribute("data") != null) {
+            server = source.getAttribute("data");
+        }
+        $("#DeleteMessage").html("Delete server " + server + "?");
+        UIkit.modal($("#delete-modal")).show();
+    }
+
+    var getServerList = function () {
+        $.ajax({
+            url: "/load-balancer/api/getServerList",
+            type: "GET",
+            error: function (data, status) {
+            },
+            success: function (data, status) {
+                $("#tbody").empty();
+                for (let i = 0; i < data.length; i++) {
+                    let tr = document.createElement("tr");
+                    let td = document.createElement("td");
+                    td.innerHTML = data[i].address;
+                    tr.appendChild(td);
+                    td = document.createElement("td");
+                    td.innerHTML = data[i].routedCount;
+                    tr.appendChild(td);
+                    td = document.createElement("td");
+                    td.innerHTML = humanFileSize(data[i].routedVolume);
+                    tr.appendChild(td);
+                    td = document.createElement("td");
+                    td.innerHTML = "click";
+                    td.style.color = "#2222FF";
+                    td.style.userSelect = "none";
+                    td.setAttribute("data", data[i].address);
+                    td.onclick = showUris;
+                    tr.appendChild(td);
+                    td = document.createElement("td");
+                    td.innerHTML = "click";
+                    td.style.color = "#2222FF";
+                    td.style.userSelect = "none";
+                    td.setAttribute("data", data[i].address);
+                    td.onclick = deleteServer;
+                    tr.appendChild(td);
+                    document.getElementById("tbody").appendChild(tr);
+                }
+            }
+        });
+    }
+
+    setInterval(function () {
+        getServerList();
+    }, 1000);
+    getServerList();
+
+    $("#RefreshBut").click(function () {
+        showUris();
+    });
+
+    $("#OptionBut").click(function () {
+        UIkit.modal($("#option-modal")).show();
+    });
+    $("#ClearBut").click(function () {
+        UIkit.modal($("#option-modal")).hide();
+        $.ajax({
+            url: "/load-balancer/api/clearLogs",
+            type: "GET",
+            error: function (data, status) {
+            },
+            success: function (data, status) {
+                getServerList();
+                notify("primary", data, 3000);
+            }
+        });
+    });
+    $("#ListRoutedUrls").click(function () {
+        UIkit.modal($("#option-modal")).hide();
+        $.ajax({
+            url: "/load-balancer/api/listRoutedUris",
+            type: "GET",
+            error: function (data, status) {
+            },
+            success: function (data, status) {
+                copyClipboard(data, "Copied to clipboard!");
+                console.log(data);
+            }
+        });
+    });
+    $("#AddServerBut").click(function () {
+        $("#edit-modal-text").html("Enter the URL:");
+        $("#modalField").val("");
+        inputModalChoice = "addServer";
+        UIkit.modal($("#option-modal")).hide();
+        UIkit.modal($("#InputModal")).show();
+    });
+    $("#SubmitBut").click(function () {
+        UIkit.modal($("#InputModal")).hide();
+        var y = "" + $("#modalField").val();
+        if (inputModalChoice === "addServer") {
+            $.ajax({
+                url: "/load-balancer/api/addServer",
+                type: "POST",
+                error: function (data, status) {
+                },
+                success: function (data, status) {
+                    getServerList();
+                    notify("primary", data, 3000);
+                },
+                data: y
+            });
+        }
+    });
+    $("#modalField").keyup(function (e) {
+        if (e.keyCode == 13) {
+            $("#SubmitBut").trigger('click');
+        }
+    });
+</script>
+</body>
+</html>
